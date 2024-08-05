@@ -1,0 +1,6 @@
+services:
+  padel:
+    image: ghcr.io/drjole/padel:latest
+    extends:
+      file: docker-compose.yml
+      service: padel
