@@ -99,12 +99,12 @@ async fn main() -> Result<()> {
                     course,
                     signup_request
                 );
-                // perform_signup(
-                //     &participant,
-                //     course.kursid,
-                //     signup_request.start_time.date(),
-                // )
-                // .await?;
+                perform_signup(
+                    &participant,
+                    course.kursid,
+                    signup_request.start_time.date(),
+                )
+                .await?;
                 // Remove the signup request as we have successfully signed up
                 signup_requests.retain(|r| r != signup_request);
             }
