@@ -51,12 +51,12 @@ async fn main() -> Result<()> {
         .iter_mut()
         .for_each(|angebot| angebot.clean());
 
-    // Parse the participant from participant.json
-    let participant_json = std::fs::read_to_string("participant.json")?;
+    // Parse the participant from the JSON file
+    let participant_json = std::fs::read_to_string("data/participant.json")?;
     let participant: Participant = serde_json::from_str(&participant_json)?;
 
-    // Parse the signup requests from signups.json
-    let signup_requests = std::fs::read_to_string("signups.json")?;
+    // Parse the signup requests from the JSON file
+    let signup_requests = std::fs::read_to_string("data/signups.json")?;
     let mut signup_requests: Vec<SignupRequest> = serde_json::from_str(&signup_requests)?;
 
     for signup_request in signup_requests.clone().iter() {
@@ -99,12 +99,12 @@ async fn main() -> Result<()> {
                     course,
                     signup_request
                 );
-                perform_signup(
-                    &participant,
-                    course.kursid,
-                    signup_request.start_time.date(),
-                )
-                .await?;
+                // perform_signup(
+                //     &participant,
+                //     course.kursid,
+                //     signup_request.start_time.date(),
+                // )
+                // .await?;
                 // Remove the signup request as we have successfully signed up
                 signup_requests.retain(|r| r != signup_request);
             }
@@ -116,7 +116,7 @@ async fn main() -> Result<()> {
 
     // Write the remaining signup requests back to signups.json
     let signup_requests = serde_json::to_string_pretty(&signup_requests)?;
-    std::fs::write("signups.json", signup_requests)?;
+    std::fs::write("data/signups.json", signup_requests)?;
 
     Ok(())
 }

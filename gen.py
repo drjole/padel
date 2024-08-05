@@ -20,5 +20,5 @@ while True:
     })
     date += datetime.timedelta(days=7)
 
-with open("signups.json", "w") as f:
+with open("data/signups.json", "w") as f:
     f.write(json.dumps(data, indent=2, default=lambda d: d.isoformat()))

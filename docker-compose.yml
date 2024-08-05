@@ -1,6 +1,7 @@
 services:
   padel:
     build: .
-    restart: always
     environment:
       RUST_LOG: info
+    volumes:
+      - ./data:/data

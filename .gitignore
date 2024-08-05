@@ -1,4 +1,3 @@
-/target
 /.env
-participant.json
-signups.json
+/data
+/target
