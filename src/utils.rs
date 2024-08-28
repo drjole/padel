@@ -1,3 +1,4 @@
+use crate::signup::{SignupData, SignupRequest};
 use chrono::Datelike;
 use color_eyre::{eyre::eyre, Result};
 use encoding::{all::ISO_8859_1, Encoding};
@@ -7,8 +8,6 @@ use regex::Regex;
 use reqwest::RequestBuilder;
 use scraper::{ElementRef, Html};
 use tokio::time::{sleep, Duration};
-
-use crate::participant::Participant;
 
 const SIGNUP_URL: &str = "https://isis.verw.uni-koeln.de/cgi/anmeldung.fcgi";
 
@@ -22,18 +21,17 @@ lazy_static! {
     static ref SUCCESS_RESPONSE_REGEX: Regex = get_success_response_regex();
 }
 
-pub async fn perform_signup(
-    participant: &Participant,
-    course_id: i32,
-    date: chrono::NaiveDate,
-) -> Result<()> {
+pub async fn perform_signup(signup_data: SignupData) -> Result<SignupRequest> {
     let client = reqwest::Client::new();
     let form_url = String::from("https://isis.verw.uni-koeln.de/cgi/anmeldung.fcgi");
 
     // Step 1: Get the signup page that contains session specific data
     let params = vec![
-        ("Kursid".to_string(), course_id.to_string()),
-        ("Termin".to_string(), date.format("%Y-%m-%d").to_string()),
+        ("Kursid".to_string(), signup_data.course_id.to_string()),
+        (
+            "Termin".to_string(),
+            signup_data.date.format("%Y-%m-%d").to_string(),
+        ),
         ("submit".to_string(), "weiter zur Buchung".to_string()),
     ];
     let body = request_body_from_params(params)?;
@@ -46,7 +44,7 @@ pub async fn perform_signup(
         let document = scraper::Html::parse_document(response.as_str());
         let form = parse_form(&document)?;
         let mut params = params_from_form(form, false)?;
-        let participant_params = participant.as_payload();
+        let participant_params = signup_data.participant.as_payload();
         for (key, value) in participant_params {
             params.push((key, value));
         }
@@ -92,7 +90,7 @@ pub async fn perform_signup(
                     "Bitte geben Sie Ihre Emailadresse ein, um Ihre Buchungsbestätigung abzurufen",
                 )
             {
-                Ok(())
+                Ok(signup_data.signup_request)
             } else if html.contains("Für die Buchung dieses Angebots")
                 && html.contains("müssen Sie vorher eines folgender Angebote gebucht haben")
                 && html.contains("Sportticket")

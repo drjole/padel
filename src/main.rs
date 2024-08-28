@@ -3,25 +3,16 @@ extern crate pretty_env_logger;
 mod angebotsdaten;
 mod gender;
 mod participant;
+mod signup;
 mod status;
 mod utils;
 
+use crate::angebotsdaten::Angebotsdaten;
 use crate::participant::Participant;
-use crate::utils::german_day_name;
-use angebotsdaten::Angebotsdaten;
-use chrono::prelude::*;
-use chrono::NaiveDate;
+use crate::signup::{perform_signups, SignupRequest};
 use color_eyre::Result;
-use serde::{Deserialize, Serialize};
-use utils::perform_signup;
 
 const COURSES_URL: &str = "https://unisport.koeln/e65/e35801/e35916/e35928/publicXMLData";
-
-#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
-struct SignupRequest {
-    start_time: NaiveDateTime,
-    end_time: NaiveDateTime,
-}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -37,20 +28,6 @@ async fn main() -> Result<()> {
 
     pretty_env_logger::init_timed();
 
-    let xml_data = reqwest::get(COURSES_URL).await?.text().await?;
-    let mut angebotsdaten: Angebotsdaten = serde_xml_rs::from_str(&xml_data)?;
-
-    angebotsdaten
-        .angebote
-        .angebot
-        .retain(|angebot| angebot.angebotsname == "Padel" && angebot.details == "Platzmiete");
-
-    angebotsdaten
-        .angebote
-        .angebot
-        .iter_mut()
-        .for_each(|angebot| angebot.clean());
-
     // Parse the participant from the JSON file
     let participant_json = std::fs::read_to_string("data/participant.json")?;
     let participant: Participant = serde_json::from_str(&participant_json)?;
@@ -59,60 +36,25 @@ async fn main() -> Result<()> {
     let signup_requests = std::fs::read_to_string("data/signups.json")?;
     let mut signup_requests: Vec<SignupRequest> = serde_json::from_str(&signup_requests)?;
 
-    for signup_request in signup_requests.clone().iter() {
-        let start_of_week = NaiveDate::from_isoywd_opt(
-            signup_request.start_time.year(),
-            signup_request.start_time.iso_week().week(),
-            chrono::Weekday::Mon,
-        )
-        .expect("a valid date");
+    // Query the courses
+    let xml_data = reqwest::get(COURSES_URL).await?.text().await?;
+    let mut angebotsdaten: Angebotsdaten = serde_xml_rs::from_str(&xml_data)?;
 
-        let end_of_week = NaiveDate::from_isoywd_opt(
-            signup_request.end_time.year(),
-            signup_request.end_time.iso_week().week(),
-            chrono::Weekday::Sun,
-        )
-        .expect("a valid date");
+    // Filter for Padel Platzmiete
+    angebotsdaten
+        .angebote
+        .angebot
+        .retain(|angebot| angebot.angebotsname == "Padel" && angebot.details == "Platzmiete");
 
-        let course = angebotsdaten.angebote.angebot.iter().find(|angebot| {
-            angebot.frei != 0
-                && angebot.zeitraum
-                    == format!(
-                        "{}-{}",
-                        start_of_week.format("%d.%m."),
-                        end_of_week.format("%d.%m.%y")
-                    )
-                && angebot.uhrzeit.contains(&format!(
-                    "{}-{}",
-                    signup_request.start_time.format("%H:%M"),
-                    signup_request.end_time.format("%H:%M")
-                ))
-                && angebot
-                    .tag
-                    .contains(&german_day_name(signup_request.start_time.date()).to_string())
-        });
+    // Clean up the data
+    angebotsdaten
+        .angebote
+        .angebot
+        .iter_mut()
+        .for_each(|angebot| angebot.clean());
 
-        match course {
-            Some(course) => {
-                log::info!(
-                    "Course found: {:?} for signup request: {:?}",
-                    course,
-                    signup_request
-                );
-                perform_signup(
-                    &participant,
-                    course.kursid,
-                    signup_request.start_time.date(),
-                )
-                .await?;
-                // Remove the signup request as we have successfully signed up
-                signup_requests.retain(|r| r != signup_request);
-            }
-            None => {
-                log::info!("No course found for signup request: {:?}", signup_request);
-            }
-        };
-    }
+    // Perform the signups
+    perform_signups(&angebotsdaten, &participant, &mut signup_requests).await?;
 
     // Write the remaining signup requests back to signups.json
     let signup_requests = serde_json::to_string_pretty(&signup_requests)?;

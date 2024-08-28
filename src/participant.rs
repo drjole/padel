@@ -1,7 +1,7 @@
 use crate::{gender::Gender, status::Status};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Participant {
     pub given_name: Option<String>,
     pub last_name: Option<String>,
