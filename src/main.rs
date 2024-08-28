@@ -7,10 +7,12 @@ mod signup;
 mod status;
 mod utils;
 
+use std::time::Duration;
+
 use crate::angebotsdaten::Angebotsdaten;
 use crate::participant::Participant;
 use crate::signup::{perform_signups, SignupRequest};
-use chrono::prelude::*;
+use chrono::{prelude::*, TimeDelta};
 use color_eyre::Result;
 
 const COURSES_URL: &str = "https://unisport.koeln/e65/e35801/e35916/e35928/publicXMLData";
@@ -29,6 +31,8 @@ async fn main() -> Result<()> {
 
     pretty_env_logger::init_timed();
 
+    let now = Local::now().naive_local();
+
     // Parse the participant from the JSON file
     let participant_json = std::fs::read_to_string("data/participant.json")?;
     let participant: Participant = serde_json::from_str(&participant_json)?;
@@ -36,6 +40,15 @@ async fn main() -> Result<()> {
     // Parse the signup requests from the JSON file
     let signup_requests_json = std::fs::read_to_string("data/signups.json")?;
     let mut signup_requests: Vec<SignupRequest> = serde_json::from_str(&signup_requests_json)?;
+
+    // Remove signup requests from the past
+    signup_requests.retain(|signup_request| signup_request.start_time.date() >= now.date());
+
+    // Remove signup requests that are less than 36 hours in the future
+    // (24 hours cancellation period + 12 hours buffer)
+    signup_requests.retain(|signup_request| signup_request.start_time - now > TimeDelta::hours(36));
+
+    // Print the remaining signup requests
     for signup_request in signup_requests.iter() {
         log::info!(
             "Trying to signup for court on {} from {} to {}",
@@ -64,11 +77,6 @@ async fn main() -> Result<()> {
 
     // Perform the signups
     perform_signups(&angebotsdaten, &participant, &mut signup_requests).await?;
-
-    // Remove signup requests from the past
-    signup_requests.retain(|signup_request| {
-        signup_request.start_time.date() >= Local::now().naive_local().date()
-    });
 
     // Write the remaining signup requests back to signups.json
     let signup_requests = serde_json::to_string_pretty(&signup_requests)?;
