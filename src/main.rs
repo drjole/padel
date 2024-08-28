@@ -10,6 +10,7 @@ mod utils;
 use crate::angebotsdaten::Angebotsdaten;
 use crate::participant::Participant;
 use crate::signup::{perform_signups, SignupRequest};
+use chrono::prelude::*;
 use color_eyre::Result;
 
 const COURSES_URL: &str = "https://unisport.koeln/e65/e35801/e35916/e35928/publicXMLData";
@@ -33,8 +34,16 @@ async fn main() -> Result<()> {
     let participant: Participant = serde_json::from_str(&participant_json)?;
 
     // Parse the signup requests from the JSON file
-    let signup_requests = std::fs::read_to_string("data/signups.json")?;
-    let mut signup_requests: Vec<SignupRequest> = serde_json::from_str(&signup_requests)?;
+    let signup_requests_json = std::fs::read_to_string("data/signups.json")?;
+    let mut signup_requests: Vec<SignupRequest> = serde_json::from_str(&signup_requests_json)?;
+    for signup_request in signup_requests.iter() {
+        log::info!(
+            "Trying to signup for court on {} from {} to {}",
+            signup_request.start_time.date().format("%d.%m.%Y"),
+            signup_request.start_time.format("%H:%M"),
+            signup_request.end_time.format("%H:%M")
+        );
+    }
 
     // Query the courses
     let xml_data = reqwest::get(COURSES_URL).await?.text().await?;
@@ -55,6 +64,11 @@ async fn main() -> Result<()> {
 
     // Perform the signups
     perform_signups(&angebotsdaten, &participant, &mut signup_requests).await?;
+
+    // Remove signup requests from the past
+    signup_requests.retain(|signup_request| {
+        signup_request.start_time.date() >= Local::now().naive_local().date()
+    });
 
     // Write the remaining signup requests back to signups.json
     let signup_requests = serde_json::to_string_pretty(&signup_requests)?;

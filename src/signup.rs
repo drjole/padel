@@ -64,11 +64,7 @@ pub async fn perform_signups(
 
             match course {
                 Some(course) => {
-                    log::info!(
-                        "Course found: {:?} for signup request: {:?}",
-                        course,
-                        signup_request
-                    );
+                    log::info!("Course found: {course:?} for signup request: {signup_request:?}",);
                     Some(SignupData {
                         signup_request: signup_request.clone(),
                         participant: participant.clone(),
@@ -77,7 +73,12 @@ pub async fn perform_signups(
                     })
                 }
                 None => {
-                    log::info!("No course found for signup request: {:?}", signup_request);
+                    log::info!(
+                        "No booking found for court on {} from {} to {}",
+                        signup_request.start_time.date().format("%d.%m.%Y"),
+                        signup_request.start_time.format("%H:%M"),
+                        signup_request.end_time.format("%H:%M")
+                    );
                     None
                 }
             }
