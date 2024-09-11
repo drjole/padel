@@ -48,6 +48,11 @@ async fn main() -> Result<()> {
     // (24 hours cancellation period + 12 hours buffer)
     signup_requests.retain(|signup_request| signup_request.start_time - now > TimeDelta::hours(36));
 
+    if signup_requests.is_empty() {
+        log::info!("No signups to perform");
+        return Ok(());
+    }
+
     // Print the remaining signup requests
     for signup_request in signup_requests.iter() {
         log::info!(
